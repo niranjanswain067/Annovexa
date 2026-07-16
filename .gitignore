@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+uploads/
+labels/
+static/outputs/
+yolo_dataset/
+yolo_dataset.zip
+.env

@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <title>AI Auto Annotation Tool</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
+
+</head>
+
+
+<body>
+
+<div class="container">
+
+
+    <!-- ==========================================
+         TITLE
+    =========================================== -->
+
+    <h1>
+        AI Auto Annotation Tool
+    </h1>
+
+
+    <!-- ==========================================
+         IMAGE UPLOAD FORM
+    =========================================== -->
+
+    <form
+        action="/detect"
+        method="POST"
+        enctype="multipart/form-data"
+    >
+
+        <label>
+            Select Images
+        </label>
+
+
+        <!-- Multiple images can be selected -->
+
+        <input
+            type="file"
+            name="images"
+            accept="image/*"
+            multiple
+            required
+        >
+
+
+        <label>
+            Objects
+        </label>
+
+
+        <input
+            type="text"
+            name="classes"
+            placeholder="bottle, chair, table"
+            required
+        >
+
+
+        <button type="submit">
+
+            Auto Annotate
+
+        </button>
+
+
+    </form>
+
+
+
+    <!-- ==========================================
+         ANNOTATION EDITOR
+    =========================================== -->
+
+    {% if output_image %}
+
+
+    <hr>
+
+
+    <!-- ==========================================
+         DATASET PROGRESS
+    =========================================== -->
+
+    <div class="progress-dashboard">
+
+        <h3>
+            Dataset Progress
+        </h3>
+
+
+        <div class="progress-stats">
+
+
+            <span>
+
+                Total:
+
+                <strong id="totalImages">
+                    0
+                </strong>
+
+            </span>
+
+
+            <span>
+
+                Reviewed:
+
+                <strong id="reviewedImages">
+                    0
+                </strong>
+
+            </span>
+
+
+            <span>
+
+                Remaining:
+
+                <strong id="remainingImages">
+                    0
+                </strong>
+
+            </span>
+
+
+            <span>
+
+                Progress:
+
+                <strong id="progressPercentage">
+                    0%
+                </strong>
+
+            </span>
+
+
+        </div>
+
+
+        <!-- Progress Bar -->
+
+        <div class="progress-bar">
+
+            <div
+                id="progressBarFill"
+                class="progress-bar-fill"
+            >
+            </div>
+
+        </div>
+
+
+    </div>
+
+
+
+    <!-- ==========================================
+         ANNOTATION STATISTICS
+    =========================================== -->
+
+    <div class="annotation-statistics">
+
+        <h3>
+            Annotation Statistics
+        </h3>
+
+
+        <!-- Class statistics will be
+             inserted here by app.js -->
+
+        <div id="classStatistics">
+
+            Loading statistics...
+
+        </div>
+
+
+        <p>
+
+            Total Annotations:
+
+            <strong id="totalAnnotations">
+                0
+            </strong>
+
+        </p>
+
+
+    </div>
+
+
+
+    <!-- ==========================================
+         ANNOTATION EDITOR TITLE
+    =========================================== -->
+
+    <h2>
+        Annotation Editor
+    </h2>
+
+
+
+    <!-- ==========================================
+         CURRENT IMAGE INFORMATION
+    =========================================== -->
+
+    {% if current_filename %}
+
+    <p>
+
+        Current Image:
+
+        <strong>
+
+            {{ current_filename }}
+
+        </strong>
+
+    </p>
+
+    {% endif %}
+
+
+
+    <!-- ==========================================
+         IMAGE NAVIGATION
+    =========================================== -->
+
+    <div class="navigation">
+
+
+        <!-- Previous Button -->
+
+        {% if current_index > 0 %}
+
+        <button
+            type="button"
+            onclick="window.location.href='/image/{{ current_index - 1 }}'"
+        >
+
+            ← Previous
+
+        </button>
+
+        {% else %}
+
+        <button
+            type="button"
+            disabled
+        >
+
+            ← Previous
+
+        </button>
+
+        {% endif %}
+
+
+
+        <!-- Image Counter -->
+
+        <span id="imageCounter">
+
+            Image {{ current_index + 1 }}
+
+            of
+
+            {{ total_images }}
+
+        </span>
+
+
+
+        <!-- Next Button -->
+
+        {% if current_index < total_images - 1 %}
+
+        <button
+            type="button"
+            onclick="window.location.href='/image/{{ current_index + 1 }}'"
+        >
+
+            Next →
+
+        </button>
+
+        {% else %}
+
+        <button
+            type="button"
+            disabled
+        >
+
+            Next →
+
+        </button>
+
+        {% endif %}
+
+
+    </div>
+
+
+
+    <br>
+
+
+
+    <!-- ==========================================
+         ANNOTATION TOOLBAR
+    =========================================== -->
+
+    <div class="toolbar">
+
+
+        <!-- Add Box -->
+
+        <button
+            type="button"
+            id="addBoxBtn"
+        >
+
+            Add Box
+
+        </button>
+
+
+
+        <!-- Edit Class -->
+
+        <button
+            type="button"
+            id="editClassBtn"
+        >
+
+            Edit Class
+
+        </button>
+
+
+
+        <!-- Delete Selected -->
+
+        <button
+            type="button"
+            id="deleteBox"
+        >
+
+            Delete Selected
+
+        </button>
+
+
+
+        <!-- Save Labels -->
+
+        <button
+            type="button"
+            id="saveLabels"
+        >
+
+            Save Labels
+
+        </button>
+
+
+
+        <!-- Save And Next -->
+
+        <button
+            type="button"
+            id="saveAndNextBtn"
+        >
+
+            Save & Next
+
+        </button>
+
+
+
+        <!-- Export Dataset -->
+
+        <a href="/export_dataset">
+
+            <button
+                type="button"
+            >
+
+                Export YOLO Dataset
+
+            </button>
+
+        </a>
+
+
+    </div>
+
+
+
+    <br>
+
+
+
+    <!-- ==========================================
+         FABRIC.JS CANVAS
+    =========================================== -->
+
+    <canvas
+        id="canvas"
+        width="900"
+        height="650"
+    >
+
+    </canvas>
+
+
+
+    <!-- ==========================================
+         SOURCE IMAGE
+    =========================================== -->
+
+    <img
+        id="sourceImage"
+        src="{{ output_image }}"
+        hidden
+    >
+
+
+
+    <!-- ==========================================
+         DETECTION DATA FROM FLASK
+    =========================================== -->
+
+    <script>
+
+        const detections =
+            {{ detections | tojson }};
+
+    </script>
+
+
+
+    <!-- ==========================================
+         FABRIC.JS
+    =========================================== -->
+
+    <script
+        src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"
+    >
+    </script>
+
+
+
+    <!-- ==========================================
+         APPLICATION JAVASCRIPT
+    =========================================== -->
+
+    <script
+        src="{{ url_for('static', filename='app.js') }}"
+    >
+    </script>
+
+
+    {% endif %}
+
+
+</div>
+
+
+</body>
+
+</html>
