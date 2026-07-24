@@ -3,6 +3,7 @@
 // ==========================================
 
 let addMode = false;
+let polygonMode = false;
 
 let imageScale = 1;
 let originalImageWidth = 0;
@@ -12,6 +13,8 @@ let startX = 0;
 let startY = 0;
 
 let tempRect = null;
+let polygonPoints = [];
+let polygonLines = [];
 
 // Track whether user has changed annotations
 let hasUnsavedChanges = false;
@@ -76,60 +79,61 @@ fabric.Image.fromURL(
 
         detections.forEach(det => {
 
-            const rect =
-                new fabric.Rect({
-
-                    left:
-                        det.x1 * scale,
-
-                    top:
-                        det.y1 * scale,
-
-                    width:
-                        (det.x2 - det.x1)
-                        * scale,
-
-                    height:
-                        (det.y2 - det.y1)
-                        * scale,
-
-                    fill:
-                        "rgba(255, 0, 0, 0.05)",
-
-                    stroke:
-                        "red",
-
-                    strokeWidth:
-                        2,
-
-                    cornerColor:
-                        "blue",
-
-                    transparentCorners:
-                        false,
-
-                    hasRotatingPoint:
-                        false,
-
-                    lockRotation:
-                        true,
-
-                    objectCaching:
-                        false
-
-                });
-
-
-            // Store annotation information
-            rect.className =
-                det.class_name;
-
-            rect.confidence =
-                det.confidence;
-
-
-            // Add annotation
+            // 1. Draw Bounding Box
+            const rect = new fabric.Rect({
+                left: det.x1 * scale,
+                top: det.y1 * scale,
+                width: (det.x2 - det.x1) * scale,
+                height: (det.y2 - det.y1) * scale,
+                fill: (det.polygon && det.polygon.length > 0) ? "transparent" : "rgba(255, 0, 0, 0.05)",
+                stroke: "green",
+                strokeWidth: 2,
+                cornerColor: "blue",
+                transparentCorners: false,
+                lockRotation: true,
+                objectCaching: false
+            });
+            
+            rect.className = det.class_name;
+            rect.confidence = det.confidence;
+            
+            if (det.polygon && det.polygon.length > 0) {
+                rect.isAuxiliary = true;
+            }
             canvas.add(rect);
+
+            // 2. Draw Polygon Mask
+            if (det.polygon && det.polygon.length > 0) {
+                const scaledPoints = det.polygon.map(p => ({
+                    x: p.x * scale,
+                    y: p.y * scale
+                }));
+
+                const poly = new fabric.Polygon(scaledPoints, {
+                    fill: "rgba(255, 165, 0, 0.4)", // orange tint like screenshot
+                    stroke: "transparent",
+                    cornerColor: "blue",
+                    transparentCorners: false,
+                    lockRotation: true,
+                    objectCaching: false
+                });
+                poly.className = det.class_name;
+                poly.confidence = det.confidence;
+                canvas.add(poly);
+            }
+            
+            // 3. Draw Label Text
+            const text = new fabric.Text(`${det.class_name}: ${(det.confidence || 1.0).toFixed(2)}`, {
+                left: det.x1 * scale,
+                top: (det.y1 * scale) - 20,
+                fontSize: 16,
+                backgroundColor: 'green',
+                fill: 'white',
+                selectable: false,
+                evented: false
+            });
+            text.isAuxiliary = true;
+            canvas.add(text);
 
         });
 
@@ -197,6 +201,7 @@ document
 .onclick = function () {
 
     addMode = true;
+    polygonMode = false;
 
     // Prevent selecting existing boxes
     canvas.selection = false;
@@ -210,6 +215,29 @@ document
 
 };
 
+// ==========================================
+// ADD POLYGON BUTTON
+// ==========================================
+
+document
+.getElementById("addPolygonBtn")
+.onclick = function () {
+
+    polygonMode = true;
+    addMode = false;
+
+    canvas.selection = false;
+    canvas.discardActiveObject();
+    canvas.defaultCursor = "crosshair";
+    
+    // Clear any partial polygon
+    polygonPoints = [];
+    polygonLines.forEach(item => canvas.remove(item));
+    polygonLines = [];
+
+    canvas.renderAll();
+};
+
 
 // ==========================================
 // MOUSE DOWN
@@ -220,56 +248,56 @@ canvas.on(
     "mouse:down",
     function (opt) {
 
-        if (!addMode) {
-            return;
-        }
+        if (addMode) {
+            const pointer =
+                canvas.getPointer(opt.e);
 
+            startX = pointer.x;
+            startY = pointer.y;
 
-        const pointer =
-            canvas.getPointer(opt.e);
+            tempRect =
+                new fabric.Rect({
+                    left: startX,
+                    top: startY,
+                    width: 0,
+                    height: 0,
+                    fill: "rgba(0, 255, 0, 0.10)",
+                    stroke: "green",
+                    strokeWidth: 2,
+                    selectable: false,
+                    evented: false
+                });
 
-
-        startX = pointer.x;
-        startY = pointer.y;
-
-
-        tempRect =
-            new fabric.Rect({
-
-                left:
-                    startX,
-
-                top:
-                    startY,
-
-                width:
-                    0,
-
-                height:
-                    0,
-
-                fill:
-                    "rgba(0, 255, 0, 0.10)",
-
-                stroke:
-                    "green",
-
-                strokeWidth:
-                    2,
-
-                selectable:
-                    false,
-
-                evented:
-                    false
-
+            canvas.add(tempRect);
+        } else if (polygonMode) {
+            const pointer = canvas.getPointer(opt.e);
+            polygonPoints.push({ x: pointer.x, y: pointer.y });
+            
+            const circle = new fabric.Circle({
+                radius: 3,
+                fill: 'red',
+                left: pointer.x,
+                top: pointer.y,
+                originX: 'center',
+                originY: 'center',
+                selectable: false,
+                evented: false
             });
-
-
-        canvas.add(
-            tempRect
-        );
-
+            canvas.add(circle);
+            polygonLines.push(circle);
+            
+            if (polygonPoints.length > 1) {
+                const prev = polygonPoints[polygonPoints.length - 2];
+                const line = new fabric.Line([prev.x, prev.y, pointer.x, pointer.y], {
+                    stroke: 'red',
+                    strokeWidth: 2,
+                    selectable: false,
+                    evented: false
+                });
+                canvas.add(line);
+                polygonLines.push(line);
+            }
+        }
     }
 );
 
@@ -478,6 +506,50 @@ canvas.on(
     }
 );
 
+// ==========================================
+// DOUBLE CLICK
+// FINISH NEW POLYGON
+// ==========================================
+
+canvas.on('mouse:dblclick', function(opt) {
+    if (polygonMode && polygonPoints.length > 2) {
+        // Create polygon
+        const poly = new fabric.Polygon(polygonPoints, {
+            fill: "rgba(255, 0, 0, 0.05)",
+            stroke: "red",
+            strokeWidth: 2,
+            selectable: true,
+            evented: true,
+            cornerColor: "blue",
+            transparentCorners: false,
+            lockRotation: true,
+            objectCaching: false
+        });
+        
+        // Remove temporary lines and circles
+        polygonLines.forEach(item => canvas.remove(item));
+        polygonLines = [];
+        polygonPoints = [];
+        
+        canvas.add(poly);
+        canvas.setActiveObject(poly);
+        
+        polygonMode = false;
+        canvas.selection = true;
+        canvas.defaultCursor = "default";
+        canvas.renderAll();
+        
+        const className = prompt("Enter Class Name:");
+        if (className && className.trim() !== "") {
+            poly.className = className.trim();
+            poly.confidence = null;
+            hasUnsavedChanges = true;
+        } else {
+            canvas.remove(poly);
+        }
+    }
+});
+
 
 // ==========================================
 // EDIT CLASS
@@ -583,6 +655,7 @@ function collectAnnotationData() {
     .getObjects()
     .forEach(obj => {
 
+        if (obj.isAuxiliary) return;
 
         // Annotation rectangles
         if (
@@ -591,7 +664,7 @@ function collectAnnotationData() {
         ) {
 
             annotations.push({
-
+                type: "rect",
                 class_name:
                     obj.className,
 
@@ -611,6 +684,22 @@ function collectAnnotationData() {
 
             });
 
+        } else if (
+            obj.type === "polygon" &&
+            obj.className
+        ) {
+            
+            const matrix = obj.calcTransformMatrix();
+            const absolutePoints = obj.points.map(function(p) {
+                return fabric.util.transformPoint({ x: p.x, y: p.y }, matrix);
+            });
+            
+            annotations.push({
+                type: "polygon",
+                class_name: obj.className,
+                points: absolutePoints
+            });
+            
         }
 
     });
@@ -1140,101 +1229,7 @@ function loadDatasetProgress() {
 }
 
 
-// ==========================================
-// LOAD ANNOTATION STATISTICS
-// ==========================================
-
-function loadAnnotationStatistics() {
-
-    fetch("/annotation_stats")
-
-    .then(response => response.json())
-
-    .then(data => {
-
-        if (data.status !== "success") {
-            return;
-        }
-
-
-        const container =
-            document.getElementById(
-                "classStatistics"
-            );
-
-
-        const totalElement =
-            document.getElementById(
-                "totalAnnotations"
-            );
-
-
-        if (
-            !container ||
-            !totalElement
-        ) {
-            return;
-        }
-
-
-        // Clear old statistics
-        container.innerHTML = "";
-
-
-        // Display every class
-        Object.entries(
-            data.class_counts
-        ).forEach(
-            ([className, count]) => {
-
-                const item =
-                    document.createElement(
-                        "div"
-                    );
-
-
-                item.className =
-                    "stat-item";
-
-
-                item.innerHTML = `
-
-                    <span>
-                        ${className}
-                    </span>
-
-                    <strong>
-                        ${count}
-                    </strong>
-
-                `;
-
-
-                container.appendChild(
-                    item
-                );
-
-            }
-        );
-
-
-        // Total annotations
-        totalElement.textContent =
-            data.total_annotations;
-
-    })
-
-    .catch(error => {
-
-        console.error(
-            "Statistics Error:",
-            error
-        );
-
-    });
-
-}
 
 // Load dashboard when page opens
 loadDatasetProgress();
-loadAnnotationStatistics();
+

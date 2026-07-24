@@ -40,51 +40,75 @@ def save_edited_annotations(
 
         class_id = class_names.index(class_name)
 
-        # Fabric canvas coordinates
-        left = float(annotation["left"])
-        top = float(annotation["top"])
-        width = float(annotation["width"])
-        height = float(annotation["height"])
+        # Check type
+        anno_type = annotation.get("type", "rect")
 
-        # Convert canvas coordinates back to
-        # original image coordinates
-        left = left / scale
-        top = top / scale
-        width = width / scale
-        height = height / scale
+        if anno_type == "rect":
+            # Fabric canvas coordinates
+            left = float(annotation.get("left", 0))
+            top = float(annotation.get("top", 0))
+            width = float(annotation.get("width", 0))
+            height = float(annotation.get("height", 0))
 
-        # Prevent coordinates from going outside image
-        left = max(0, min(left, image_width))
-        top = max(0, min(top, image_height))
+            # Convert canvas coordinates back to original image coordinates
+            left = left / scale
+            top = top / scale
+            width = width / scale
+            height = height / scale
 
-        width = max(
-            0,
-            min(width, image_width - left)
-        )
+            # Prevent coordinates from going outside image
+            left = max(0, min(left, image_width))
+            top = max(0, min(top, image_height))
 
-        height = max(
-            0,
-            min(height, image_height - top)
-        )
+            width = max(
+                0,
+                min(width, image_width - left)
+            )
 
-        # Skip invalid boxes
-        if width <= 1 or height <= 1:
-            continue
+            height = max(
+                0,
+                min(height, image_height - top)
+            )
 
-        # Convert XYWH to YOLO normalized format
-        center_x = (left + width / 2) / image_width
-        center_y = (top + height / 2) / image_height
+            # Skip invalid boxes
+            if width <= 1 or height <= 1:
+                continue
 
-        norm_width = width / image_width
-        norm_height = height / image_height
+            # Convert XYWH to YOLO normalized format
+            center_x = (left + width / 2) / image_width
+            center_y = (top + height / 2) / image_height
 
-        yolo_lines.append(
-            f"{class_id} "
-            f"{center_x:.6f} "
-            f"{center_y:.6f} "
-            f"{norm_width:.6f} "
-            f"{norm_height:.6f}"
-        )
+            norm_width = width / image_width
+            norm_height = height / image_height
+
+            yolo_lines.append(
+                f"{class_id} "
+                f"{center_x:.6f} "
+                f"{center_y:.6f} "
+                f"{norm_width:.6f} "
+                f"{norm_height:.6f}"
+            )
+        
+        elif anno_type == "polygon":
+            points = annotation.get("points", [])
+            if len(points) < 3:
+                continue
+            
+            norm_points = []
+            for p in points:
+                x = p["x"] / scale
+                y = p["y"] / scale
+                
+                x = max(0, min(x, image_width))
+                y = max(0, min(y, image_height))
+                
+                norm_x = x / image_width
+                norm_y = y / image_height
+                
+                norm_points.append(f"{norm_x:.6f} {norm_y:.6f}")
+                
+            points_str = " ".join(norm_points)
+            yolo_lines.append(f"{class_id} {points_str}")
 
     # Overwrite old label file
     with open(label_path, "w") as file:

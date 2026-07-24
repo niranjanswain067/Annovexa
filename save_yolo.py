@@ -69,10 +69,15 @@ def save_yolo_labels(
 
 
     # ==========================================
-    # GET DETECTED BOXES
+    # GET DETECTED BOXES & MASKS
     # ==========================================
 
     boxes = result.boxes
+    
+    if hasattr(result, "masks") and result.masks is not None:
+        masks = result.masks.xyn
+    else:
+        masks = [None] * len(boxes)
 
 
     # ==========================================
@@ -85,40 +90,25 @@ def save_yolo_labels(
         encoding="utf-8"
     ) as file:
 
-        for box in boxes:
+        for box, mask in zip(boxes, masks):
 
             # ----------------------------------
-            # Get YOLO-World temporary class ID
+            # Get YOLO-Seg COCO class ID
             # ----------------------------------
 
-            temporary_class_id = int(
+            coco_class_id = int(
                 box.cls.item()
             )
 
 
             # ----------------------------------
-            # Convert temporary ID
-            # to class name
+            # Convert COCO ID to class name
             # ----------------------------------
-
-            if (
-                temporary_class_id < 0
-                or temporary_class_id >= len(
-                    detection_classes
-                )
-            ):
-
-                print(
-                    "Warning: Invalid class ID:",
-                    temporary_class_id
-                )
-
+            
+            if coco_class_id not in result.names:
                 continue
 
-
-            class_name = detection_classes[
-                temporary_class_id
-            ]
+            class_name = result.names[coco_class_id]
 
 
             # ----------------------------------
@@ -141,29 +131,22 @@ def save_yolo_labels(
                 )
             )
 
-
             # ----------------------------------
-            # Get normalized YOLO coordinates
-            # ----------------------------------
-
-            x, y, w, h = (
-                box.xywhn[0].tolist()
-            )
-
-
-            # ----------------------------------
-            # Write YOLO annotation
+            # Write YOLO annotation (Mask or Box)
             # ----------------------------------
 
-            file.write(
-
-                f"{permanent_class_id} "
-                f"{x:.6f} "
-                f"{y:.6f} "
-                f"{w:.6f} "
-                f"{h:.6f}\n"
-
-            )
+            if mask is not None and len(mask) > 0:
+                points_str = " ".join([f"{float(pt[0]):.6f} {float(pt[1]):.6f}" for pt in mask])
+                file.write(f"{permanent_class_id} {points_str}\n")
+            else:
+                x, y, w, h = box.xywhn[0].tolist()
+                file.write(
+                    f"{permanent_class_id} "
+                    f"{x:.6f} "
+                    f"{y:.6f} "
+                    f"{w:.6f} "
+                    f"{h:.6f}\n"
+                )
 
 
     print(

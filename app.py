@@ -1002,41 +1002,21 @@ def export_dataset():
     # CREATE YOLO FOLDER STRUCTURE
     # ======================================
 
-    train_images_folder = os.path.join(
+    images_folder = os.path.join(
         EXPORT_FOLDER,
-        "images",
-        "train"
+        "images"
     )
 
-    val_images_folder = os.path.join(
+    labels_folder = os.path.join(
         EXPORT_FOLDER,
-        "images",
-        "val"
+        "labels"
     )
-
-    train_labels_folder = os.path.join(
-        EXPORT_FOLDER,
-        "labels",
-        "train"
-    )
-
-    val_labels_folder = os.path.join(
-        EXPORT_FOLDER,
-        "labels",
-        "val"
-    )
-
 
     # Create all folders
     for folder in [
-
-        train_images_folder,
-        val_images_folder,
-        train_labels_folder,
-        val_labels_folder
-
+        images_folder,
+        labels_folder
     ]:
-
         os.makedirs(
             folder,
             exist_ok=True
@@ -1048,63 +1028,7 @@ def export_dataset():
     # ======================================
 
     dataset_images = batch_images.copy()
-
-
-    # Randomize images before splitting
-    random.shuffle(
-        dataset_images
-    )
-
-
-    total_images = len(
-        dataset_images
-    )
-
-
-    # ======================================
-    # CALCULATE 80/20 SPLIT
-    # ======================================
-
-    # Special handling for one image
-    if total_images == 1:
-
-        train_images = dataset_images
-
-        val_images = []
-
-
-    else:
-
-        # Calculate 80%
-        train_count = int(
-            total_images * 0.8
-        )
-
-
-        # Ensure at least one
-        # training image
-        train_count = max(
-            1,
-            train_count
-        )
-
-
-        # Ensure at least one
-        # validation image
-        train_count = min(
-            train_count,
-            total_images - 1
-        )
-
-
-        train_images = dataset_images[
-            :train_count
-        ]
-
-
-        val_images = dataset_images[
-            train_count:
-        ]
+    total_images = len(dataset_images)
 
 
     # ======================================
@@ -1219,35 +1143,14 @@ def export_dataset():
 
 
     # ======================================
-    # COPY TRAIN DATA
+    # COPY ALL DATA
     # ======================================
 
-    train_image_count, train_label_count = (
+    image_count, label_count = (
         copy_dataset_items(
-
-            train_images,
-
-            train_images_folder,
-
-            train_labels_folder
-
-        )
-    )
-
-
-    # ======================================
-    # COPY VALIDATION DATA
-    # ======================================
-
-    val_image_count, val_label_count = (
-        copy_dataset_items(
-
-            val_images,
-
-            val_images_folder,
-
-            val_labels_folder
-
+            dataset_images,
+            images_folder,
+            labels_folder
         )
     )
 
@@ -1300,12 +1203,12 @@ def export_dataset():
 
 
         file.write(
-            "train: images/train\n"
+            "train: images\n"
         )
 
 
         file.write(
-            "val: images/val\n\n"
+            "val: images\n\n"
         )
 
 
@@ -1386,26 +1289,14 @@ def export_dataset():
 
 
     print(
-        "Training Images:",
-        train_image_count
+        "Copied Images:",
+        image_count
     )
 
 
     print(
-        "Training Labels:",
-        train_label_count
-    )
-
-
-    print(
-        "Validation Images:",
-        val_image_count
-    )
-
-
-    print(
-        "Validation Labels:",
-        val_label_count
+        "Copied Labels:",
+        label_count
     )
 
 
@@ -1507,130 +1398,7 @@ def dataset_progress():
             progress_percentage
 
     })
-# ==========================================
-# ANNOTATION STATISTICS
-# ==========================================
 
-@app.route("/annotation_stats")
-def annotation_stats():
-
-    global batch_images
-    global current_classes
-
-    # Reload latest permanent classes
-    current_classes = load_classes()
-
-    # Create initial count
-    class_counts = {
-        class_name: 0
-        for class_name in current_classes
-    }
-
-    total_annotations = 0
-
-
-    # ======================================
-    # CHECK LABELS FOR CURRENT BATCH
-    # ======================================
-
-    for image_data in batch_images:
-
-        filename = image_data.get(
-            "filename"
-        )
-
-        if not filename:
-            continue
-
-
-        # Get label filename
-        image_name = os.path.splitext(
-            filename
-        )[0]
-
-        label_path = os.path.join(
-            LABEL_FOLDER,
-            image_name + ".txt"
-        )
-
-
-        # Skip if label doesn't exist
-        if not os.path.exists(
-            label_path
-        ):
-            continue
-
-
-        # ==================================
-        # READ YOLO LABEL FILE
-        # ==================================
-
-        with open(
-            label_path,
-            "r",
-            encoding="utf-8"
-        ) as file:
-
-            for line in file:
-
-                line = line.strip()
-
-                if not line:
-                    continue
-
-
-                parts = line.split()
-
-                if len(parts) < 5:
-                    continue
-
-
-                try:
-
-                    class_id = int(
-                        parts[0]
-                    )
-
-                except ValueError:
-
-                    continue
-
-
-                # Check valid class ID
-                if (
-                    0 <= class_id
-                    < len(current_classes)
-                ):
-
-                    class_name = (
-                        current_classes[
-                            class_id
-                        ]
-                    )
-
-                    class_counts[
-                        class_name
-                    ] += 1
-
-                    total_annotations += 1
-
-
-    # ======================================
-    # RETURN STATISTICS
-    # ======================================
-
-    return jsonify({
-
-        "status":
-            "success",
-
-        "total_annotations":
-            total_annotations,
-
-        "class_counts":
-            class_counts
-
-    })
 if __name__ == "__main__":
     print("Starting AI Auto Annotation Tool...")
     app.run(
