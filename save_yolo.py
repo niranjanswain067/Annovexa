@@ -132,21 +132,17 @@ def save_yolo_labels(
             )
 
             # ----------------------------------
-            # Write YOLO annotation (Mask or Box)
+            # Write YOLO annotation (Box Only)
             # ----------------------------------
 
-            if mask is not None and len(mask) > 0:
-                points_str = " ".join([f"{float(pt[0]):.6f} {float(pt[1]):.6f}" for pt in mask])
-                file.write(f"{permanent_class_id} {points_str}\n")
-            else:
-                x, y, w, h = box.xywhn[0].tolist()
-                file.write(
-                    f"{permanent_class_id} "
-                    f"{x:.6f} "
-                    f"{y:.6f} "
-                    f"{w:.6f} "
-                    f"{h:.6f}\n"
-                )
+            x, y, w, h = box.xywhn[0].tolist()
+            file.write(
+                f"{permanent_class_id} "
+                f"{x:.6f} "
+                f"{y:.6f} "
+                f"{w:.6f} "
+                f"{h:.6f}\n"
+            )
 
 
     print(
