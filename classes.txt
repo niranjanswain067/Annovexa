@@ -23,3 +23,10 @@ fire hydrant
 skateboard
 dining table
 chair
+medicine bottle
+toothbrush
+book
+potted plant
+apple
+lizard
+donut
