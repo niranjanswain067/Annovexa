@@ -92,9 +92,18 @@ a:hover {
     display: flex;
     align-items: center;
     gap: 12px;
-    font-size: 1.1rem;
-    font-weight: 600;
+    font-size: 1.2rem;
+    font-weight: 700;
     color: var(--text-primary);
+    letter-spacing: 0.5px;
+}
+
+.app-logo {
+    height: 36px;
+    width: auto;
+    border-radius: 6px;
+    object-fit: contain;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .logo i {

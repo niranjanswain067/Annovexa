@@ -23,7 +23,7 @@
     <!-- Header Navigation -->
     <header class="app-header">
         <div class="logo">
-            <i class="ph-fill ph-bounding-box"></i>
+            <img src="{{ url_for('static', filename='logo.jpeg') }}" alt="Annovexa Logo" class="app-logo">
             <span>Annovexa</span>
         </div>
         <div class="header-actions">
@@ -44,7 +44,8 @@
                         <label class="file-upload-box">
                             <i class="ph ph-image"></i>
                             <span id="file-upload-text">Select Images</span>
-                            <input id="file-upload-input" type="file" name="images" accept="image/*" multiple required hidden>
+                            <input id="file-upload-input" type="file" name="images" accept="image/*" multiple required
+                                hidden>
                         </label>
                     </div>
 
@@ -191,7 +192,7 @@
         const loadingOverlay = document.getElementById('loadingOverlay');
 
         if (fileInput && fileText) {
-            fileInput.addEventListener('change', function() {
+            fileInput.addEventListener('change', function () {
                 if (this.files && this.files.length > 0) {
                     const count = this.files.length;
                     fileText.textContent = count + (count === 1 ? ' image selected' : ' images selected');
@@ -204,7 +205,7 @@
         }
 
         if (uploadForm && loadingOverlay) {
-            uploadForm.addEventListener('submit', function() {
+            uploadForm.addEventListener('submit', function () {
                 loadingOverlay.style.display = 'flex';
             });
         }
