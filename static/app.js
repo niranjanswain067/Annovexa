@@ -810,7 +810,6 @@ function saveLabels(
 
         hasUnsavedChanges = false;
         loadDatasetProgress();
-        loadAnnotationStatistics();
 
 
         // ==================================

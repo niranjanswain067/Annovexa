@@ -17,3 +17,9 @@ food plate
 switch
 flower
 car
+cylinder
+gas
+fire hydrant
+skateboard
+dining table
+chair

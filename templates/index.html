@@ -1,462 +1,214 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
-
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Annovexa - AI Annotation Studio</title>
 
-    <title>AI Auto Annotation Tool</title>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
-    <link
-        rel="stylesheet"
-        href="{{ url_for('static', filename='style.css') }}"
-    >
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
 
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
-
 
 <body>
 
-<div class="container">
-
-
-    <!-- ==========================================
-         TITLE
-    =========================================== -->
-
-    <h1>
-        AI Auto Annotation Tool
-    </h1>
-
-
-    <!-- ==========================================
-         IMAGE UPLOAD FORM
-    =========================================== -->
-
-    <form
-        action="/detect"
-        method="POST"
-        enctype="multipart/form-data"
-    >
-
-        <label>
-            Select Images
-        </label>
-
-
-        <!-- Multiple images can be selected -->
-
-        <input
-            type="file"
-            name="images"
-            accept="image/*"
-            multiple
-            required
-        >
-
-
-        <label>
-            Objects
-        </label>
-
-
-        <input
-            type="text"
-            name="classes"
-            placeholder="bottle, chair, table"
-            required
-        >
-
-
-        <button type="submit">
-
-            Auto Annotate
-
-        </button>
-
-
-    </form>
-
-
-
-    <!-- ==========================================
-         ANNOTATION EDITOR
-    =========================================== -->
-
-    {% if output_image %}
-
-
-    <hr>
-
-
-    <!-- ==========================================
-         DATASET PROGRESS
-    =========================================== -->
-
-    <div class="progress-dashboard">
-
-        <h3>
-            Dataset Progress
-        </h3>
-
-
-        <div class="progress-stats">
-
-
-            <span>
-
-                Total:
-
-                <strong id="totalImages">
-                    0
-                </strong>
-
-            </span>
-
-
-            <span>
-
-                Reviewed:
-
-                <strong id="reviewedImages">
-                    0
-                </strong>
-
-            </span>
-
-
-            <span>
-
-                Remaining:
-
-                <strong id="remainingImages">
-                    0
-                </strong>
-
-            </span>
-
-
-            <span>
-
-                Progress:
-
-                <strong id="progressPercentage">
-                    0%
-                </strong>
-
-            </span>
-
-
+    <!-- Header Navigation -->
+    <header class="app-header">
+        <div class="logo">
+            <i class="ph-fill ph-bounding-box"></i>
+            <span>Annovexa</span>
         </div>
+        <div class="header-actions">
+            <a href="https://github.com" target="_blank" class="header-btn" title="Documentation"><i
+                    class="ph ph-book-open"></i></a>
+        </div>
+    </header>
 
+    <div class="main-layout">
 
-        <!-- Progress Bar -->
+        <!-- Sidebar Setup & Stats -->
+        <aside class="sidebar">
 
-        <div class="progress-bar">
+            <div class="sidebar-section">
+                <h3 class="section-title"><i class="ph ph-upload-simple"></i> Upload Data</h3>
+                <form id="uploadForm" action="/detect" method="POST" enctype="multipart/form-data" class="upload-form">
+                    <div class="file-upload-wrapper">
+                        <label class="file-upload-box">
+                            <i class="ph ph-image"></i>
+                            <span id="file-upload-text">Select Images</span>
+                            <input id="file-upload-input" type="file" name="images" accept="image/*" multiple required hidden>
+                        </label>
+                    </div>
 
-            <div
-                id="progressBarFill"
-                class="progress-bar-fill"
-            >
+                    <div class="input-group">
+                        <label><i class="ph ph-tag"></i> Object Classes</label>
+                        <input type="text" name="classes" placeholder="e.g. car, person, dog" required>
+                        <small class="helper-text">Comma separated list of objects to detect.</small>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-full"><i class="ph ph-magic-wand"></i> Auto
+                        Annotate</button>
+                </form>
             </div>
 
-        </div>
+            {% if output_image %}
+            <div class="sidebar-section">
+                <h3 class="section-title"><i class="ph ph-chart-pie-slice"></i> Dataset Progress</h3>
 
+                <div class="progress-bar-container">
+                    <div class="progress-header">
+                        <span>Completion</span>
+                        <strong id="progressPercentage">0%</strong>
+                    </div>
+                    <div class="progress-bar">
+                        <div id="progressBarFill" class="progress-bar-fill"></div>
+                    </div>
+                </div>
 
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <span class="stat-label">Total</span>
+                        <strong class="stat-value" id="totalImages">0</strong>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-label">Reviewed</span>
+                        <strong class="stat-value" id="reviewedImages">0</strong>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-label">Remaining</span>
+                        <strong class="stat-value" id="remainingImages">0</strong>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <h3 class="section-title"><i class="ph ph-export"></i> Export</h3>
+                <a href="/export_dataset" class="export-link">
+                    <button type="button" class="btn btn-secondary btn-full"><i class="ph ph-download-simple"></i>
+                        Download YOLO Dataset</button>
+                </a>
+            </div>
+            {% endif %}
+
+        </aside>
+
+        <!-- Main Workspace -->
+        <main class="workspace">
+            {% if output_image %}
+
+            <div class="workspace-header">
+                <div class="file-info">
+                    <i class="ph ph-image-square"></i>
+                    <span class="filename">
+                        {% if current_filename %}{{ current_filename }}{% else %}No image selected{% endif %}
+                    </span>
+                    <span class="image-counter" id="imageCounter">Image {{ current_index + 1 }} of {{ total_images
+                        }}</span>
+                </div>
+
+                <div class="navigation-controls">
+                    {% if current_index > 0 %}
+                    <button type="button" class="btn btn-icon"
+                        onclick="window.location.href='/image/{{ current_index - 1 }}'" title="Previous Image">
+                        <i class="ph ph-caret-left"></i>
+                    </button>
+                    {% else %}
+                    <button type="button" class="btn btn-icon" disabled><i class="ph ph-caret-left"></i></button>
+                    {% endif %}
+
+                    {% if current_index < total_images - 1 %} <button type="button" class="btn btn-icon"
+                        onclick="window.location.href='/image/{{ current_index + 1 }}'" title="Next Image">
+                        <i class="ph ph-caret-right"></i>
+                        </button>
+                        {% else %}
+                        <button type="button" class="btn btn-icon" disabled><i class="ph ph-caret-right"></i></button>
+                        {% endif %}
+                </div>
+            </div>
+
+            <div class="toolbar-top">
+                <div class="tools-group">
+                    <button type="button" class="btn btn-tool" id="addBoxBtn" title="Draw Bounding Box"><i
+                            class="ph ph-bounding-box"></i> Add Box</button>
+                    <button type="button" class="btn btn-tool" id="addPolygonBtn" title="Draw Polygon (Coming Soon)"><i
+                            class="ph ph-polygon"></i> Add Polygon</button>
+                    <div class="tool-divider"></div>
+                    <button type="button" class="btn btn-tool" id="editClassBtn" title="Edit Class Name"><i
+                            class="ph ph-pencil-simple"></i> Edit Class</button>
+                    <button type="button" class="btn btn-tool btn-danger" id="deleteBox"
+                        title="Delete Selected Annotation"><i class="ph ph-trash"></i> Delete Selected</button>
+                </div>
+                <div class="tools-group">
+                    <button type="button" class="btn btn-success" id="saveLabels"><i class="ph ph-floppy-disk"></i> Save
+                        Labels</button>
+                    <button type="button" class="btn btn-primary" id="saveAndNextBtn">Save & Next <i
+                            class="ph ph-arrow-right"></i></button>
+                </div>
+            </div>
+
+            <div class="canvas-workspace">
+                <canvas id="canvas" width="900" height="650"></canvas>
+            </div>
+
+            <img id="sourceImage" src="{{ output_image }}" hidden>
+
+            <script>
+                const detections = {{ detections | tojson }};
+            </script>
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
+            <script src="{{ url_for('static', filename='app.js') }}"></script>
+
+            {% else %}
+
+            <div class="empty-state">
+                <i class="ph-duotone ph-upload-simple"></i>
+                <h2>Welcome to Annovexa</h2>
+                <p>Upload images and enter object classes on the left to start auto-annotating.</p>
+            </div>
+
+            {% endif %}
+        </main>
     </div>
 
-
-
-
-
-    <!-- ==========================================
-         ANNOTATION EDITOR TITLE
-    =========================================== -->
-
-    <h2>
-        Annotation Editor
-    </h2>
-
-
-
-    <!-- ==========================================
-         CURRENT IMAGE INFORMATION
-    =========================================== -->
-
-    {% if current_filename %}
-
-    <p>
-
-        Current Image:
-
-        <strong>
-
-            {{ current_filename }}
-
-        </strong>
-
-    </p>
-
-    {% endif %}
-
-
-
-    <!-- ==========================================
-         IMAGE NAVIGATION
-    =========================================== -->
-
-    <div class="navigation">
-
-
-        <!-- Previous Button -->
-
-        {% if current_index > 0 %}
-
-        <button
-            type="button"
-            onclick="window.location.href='/image/{{ current_index - 1 }}'"
-        >
-
-            ← Previous
-
-        </button>
-
-        {% else %}
-
-        <button
-            type="button"
-            disabled
-        >
-
-            ← Previous
-
-        </button>
-
-        {% endif %}
-
-
-
-        <!-- Image Counter -->
-
-        <span id="imageCounter">
-
-            Image {{ current_index + 1 }}
-
-            of
-
-            {{ total_images }}
-
-        </span>
-
-
-
-        <!-- Next Button -->
-
-        {% if current_index < total_images - 1 %}
-
-        <button
-            type="button"
-            onclick="window.location.href='/image/{{ current_index + 1 }}'"
-        >
-
-            Next →
-
-        </button>
-
-        {% else %}
-
-        <button
-            type="button"
-            disabled
-        >
-
-            Next →
-
-        </button>
-
-        {% endif %}
-
-
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="spinner"></div>
+        <div class="loading-text">AI is detecting objects...</div>
     </div>
-
-
-
-    <br>
-
-
-
-    <!-- ==========================================
-         ANNOTATION TOOLBAR
-    =========================================== -->
-
-    <div class="toolbar">
-
-
-        <!-- Add Box -->
-
-        <button
-            type="button"
-            id="addBoxBtn"
-        >
-
-            Add Box
-
-        </button>
-
-        <!-- Add Polygon -->
-
-        <button
-            type="button"
-            id="addPolygonBtn"
-        >
-
-            Add Polygon
-
-        </button>
-
-
-
-        <!-- Edit Class -->
-
-        <button
-            type="button"
-            id="editClassBtn"
-        >
-
-            Edit Class
-
-        </button>
-
-
-
-        <!-- Delete Selected -->
-
-        <button
-            type="button"
-            id="deleteBox"
-        >
-
-            Delete Selected
-
-        </button>
-
-
-
-        <!-- Save Labels -->
-
-        <button
-            type="button"
-            id="saveLabels"
-        >
-
-            Save Labels
-
-        </button>
-
-
-
-        <!-- Save And Next -->
-
-        <button
-            type="button"
-            id="saveAndNextBtn"
-        >
-
-            Save & Next
-
-        </button>
-
-
-
-        <!-- Export Dataset -->
-
-        <a href="/export_dataset">
-
-            <button
-                type="button"
-            >
-
-                Export YOLO Dataset
-
-            </button>
-
-        </a>
-
-
-    </div>
-
-
-
-    <br>
-
-
-
-    <!-- ==========================================
-         FABRIC.JS CANVAS
-    =========================================== -->
-
-    <canvas
-        id="canvas"
-        width="900"
-        height="650"
-    >
-
-    </canvas>
-
-
-
-    <!-- ==========================================
-         SOURCE IMAGE
-    =========================================== -->
-
-    <img
-        id="sourceImage"
-        src="{{ output_image }}"
-        hidden
-    >
-
-
-
-    <!-- ==========================================
-         DETECTION DATA FROM FLASK
-    =========================================== -->
 
     <script>
+        const fileInput = document.getElementById('file-upload-input');
+        const fileText = document.getElementById('file-upload-text');
+        const uploadForm = document.getElementById('uploadForm');
+        const loadingOverlay = document.getElementById('loadingOverlay');
 
-        const detections =
-            {{ detections | tojson }};
+        if (fileInput && fileText) {
+            fileInput.addEventListener('change', function() {
+                if (this.files && this.files.length > 0) {
+                    const count = this.files.length;
+                    fileText.textContent = count + (count === 1 ? ' image selected' : ' images selected');
+                    fileText.style.color = 'var(--accent-primary)';
+                } else {
+                    fileText.textContent = 'Select Images';
+                    fileText.style.color = '';
+                }
+            });
+        }
 
+        if (uploadForm && loadingOverlay) {
+            uploadForm.addEventListener('submit', function() {
+                loadingOverlay.style.display = 'flex';
+            });
+        }
     </script>
-
-
-
-    <!-- ==========================================
-         FABRIC.JS
-    =========================================== -->
-
-    <script
-        src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"
-    >
-    </script>
-
-
-
-    <!-- ==========================================
-         APPLICATION JAVASCRIPT
-    =========================================== -->
-
-    <script
-        src="{{ url_for('static', filename='app.js') }}"
-    >
-    </script>
-
-
-    {% endif %}
-
-
-</div>
-
-
 </body>
 
 </html>
