@@ -16,6 +16,10 @@ def results_to_json(result):
 
         x1, y1, x2, y2 = box.xyxy[0].tolist()
         
+        polygon = None
+        if mask is not None and len(mask) > 0:
+            polygon = [{"x": float(pt[0]), "y": float(pt[1])} for pt in mask]
+
         detections.append({
 
             "class_id": int(box.cls),
@@ -30,7 +34,9 @@ def results_to_json(result):
 
             "x2": x2,
 
-            "y2": y2
+            "y2": y2,
+            
+            "polygon": polygon
 
         })
 

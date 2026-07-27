@@ -4,7 +4,7 @@ import os
 import shutil
 
 # Load segmentation model
-model = YOLO("yolov8s-seg.pt")
+model = YOLO("models/yolov8s-seg.pt")
 
 
 def detect_objects(image_path, class_names):

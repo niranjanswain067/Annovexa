@@ -75,9 +75,12 @@ current_image_index = 0
 
 @app.route("/")
 def home():
+    
+    unique_classes = sorted(list(set(load_classes())))
 
     return render_template(
-        "index.html"
+        "index.html",
+        available_classes=unique_classes
     )
 
 
@@ -359,7 +362,9 @@ def detect():
                 detections,
 
             "edited_annotations":
-                None
+                None,
+
+            "ai_fresh": True
 
         })
 
@@ -420,35 +425,11 @@ def detect():
 
 
     # ======================================
-    # DISPLAY FIRST IMAGE
+    # REDIRECT TO FIRST IMAGE
     # ======================================
 
-    return render_template(
-
-        "index.html",
-
-        output_image=
-            first_image[
-                "output_image"
-            ],
-
-        detections=
-            first_image[
-                "detections"
-            ],
-
-        current_filename=
-            first_image[
-                "filename"
-            ],
-
-        current_index=
-            current_image_index,
-
-        total_images=
-            len(batch_images)
-
-    )
+    from flask import redirect
+    return redirect(url_for("show_image", index=0))
 
 
 # ==========================================
@@ -518,6 +499,7 @@ def show_image(index):
     # ======================================
     # LOAD SAVED LABELS IF THEY EXIST
     # ======================================
+    
     import os
     import cv2
     from class_manager import load_classes
@@ -525,7 +507,7 @@ def show_image(index):
     image_name = os.path.splitext(os.path.basename(image_data["filename"]))[0]
     label_path = os.path.join("labels", f"{image_name}.txt")
 
-    if os.path.exists(label_path):
+    if os.path.exists(label_path) and not image_data.get("ai_fresh"):
         try:
             permanent_classes = load_classes()
             local_image_path = image_data["output_image"].lstrip("/")
@@ -561,6 +543,36 @@ def show_image(index):
                                 "x2": x2,
                                 "y2": y2
                             })
+                        elif len(parts) > 5 and len(parts) % 2 == 1:
+                            class_id = int(parts[0])
+                            class_name = permanent_classes[class_id] if class_id < len(permanent_classes) else "Unknown"
+                            
+                            polygon = []
+                            min_x = float('inf')
+                            min_y = float('inf')
+                            max_x = float('-inf')
+                            max_y = float('-inf')
+                            
+                            for i in range(1, len(parts), 2):
+                                px = float(parts[i]) * img_w
+                                py = float(parts[i+1]) * img_h
+                                polygon.append({"x": px, "y": py})
+                                
+                                if px < min_x: min_x = px
+                                if px > max_x: max_x = px
+                                if py < min_y: min_y = py
+                                if py > max_y: max_y = py
+                                
+                            saved_detections.append({
+                                "class_id": class_id,
+                                "class_name": class_name,
+                                "confidence": 1.0,
+                                "x1": min_x,
+                                "y1": min_y,
+                                "x2": max_x,
+                                "y2": max_y,
+                                "polygon": polygon
+                            })
                 
                 # Update local variable passed to template
                 detections = saved_detections
@@ -570,33 +582,105 @@ def show_image(index):
             print("Error loading saved labels:", e)
 
     # ======================================
+    # COLLECT ALL UNIQUE CLASSES FOR DROPDOWN
+    # ======================================
+    all_classes = set(load_classes())
+    for img_data in batch_images:
+        if img_data.get("detections"):
+            for det in img_data["detections"]:
+                if det.get("class_name"):
+                    all_classes.add(det["class_name"])
+    
+    unique_classes = sorted(list(all_classes))
+
+    # ======================================
     # DISPLAY SELECTED IMAGE
     # ======================================
 
     return render_template(
-
         "index.html",
-
-        output_image=
-            image_data[
-                "output_image"
-            ],
-
-        detections=
-            detections,
-
-        current_filename=
-            image_data[
-                "filename"
-            ],
-
-        current_index=
-            current_image_index,
-
-        total_images=
-            len(batch_images)
-
+        output_image=image_data["output_image"],
+        detections=detections,
+        current_filename=image_data["filename"],
+        current_index=current_image_index,
+        total_images=len(batch_images),
+        available_classes=unique_classes
     )
+
+
+# ==========================================
+# BULK RENAME CLASSES ACROSS DATASET
+# ==========================================
+
+@app.route("/bulk_rename", methods=["POST"])
+def bulk_rename():
+    global batch_images
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"status": "error", "message": "No data received."}), 400
+        
+    old_class = data.get("from_class", "").strip().lower()
+    new_class = data.get("to_class", "").strip().lower()
+    
+    if not old_class or not new_class:
+        return jsonify({"status": "error", "message": "Missing class names."}), 400
+        
+    from class_manager import load_classes, save_classes
+    classes = load_classes()
+    
+    # Create a lower-case map of existing classes
+    classes_lower = [c.lower() for c in classes]
+    
+    if old_class not in classes_lower:
+        # If it's not in classes.txt, maybe it's just in memory. Let's just update memory.
+        old_id = -1
+    else:
+        old_id = classes_lower.index(old_class)
+    
+    new_id = -1
+    if old_id != -1:
+        if new_class not in classes_lower:
+            # Easy case: just rename it in classes.txt
+            classes[old_id] = new_class
+            save_classes(classes)
+            new_id = old_id
+        else:
+            # Merge case: new class already exists. Find its ID and replace old_id with new_id in all .txt files
+            new_id = classes_lower.index(new_class)
+            import os
+            labels_dir = "labels"
+            if os.path.exists(labels_dir):
+                for filename in os.listdir(labels_dir):
+                    if filename.endswith(".txt"):
+                        filepath = os.path.join(labels_dir, filename)
+                        with open(filepath, "r") as f:
+                            lines = f.readlines()
+                        
+                        changed = False
+                        new_lines = []
+                        for line in lines:
+                            parts = line.strip().split()
+                            if parts and int(parts[0]) == old_id:
+                                parts[0] = str(new_id)
+                                new_lines.append(" ".join(parts) + "\n")
+                                changed = True
+                            else:
+                                new_lines.append(line)
+                                
+                        if changed:
+                            with open(filepath, "w") as f:
+                                f.writelines(new_lines)
+                                
+    # Now update batch_images in memory
+    for image_data in batch_images:
+        if image_data.get("detections"):
+            for det in image_data["detections"]:
+                if det.get("class_name", "").lower() == old_class:
+                    det["class_name"] = new_class
+                    if new_id != -1:
+                        det["class_id"] = new_id
+                    
+    return jsonify({"status": "success", "message": f"Renamed '{old_class}' to '{new_class}' globally."})
 
 
 # ==========================================
@@ -905,6 +989,10 @@ def save_labels():
     ]["edited_annotations"] = (
         annotations
     )
+    
+    batch_images[
+        current_image_index
+    ]["ai_fresh"] = False
 
 
     # ======================================

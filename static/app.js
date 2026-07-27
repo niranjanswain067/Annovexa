@@ -119,21 +119,13 @@ fabric.Image.fromURL(
                 });
                 poly.className = det.class_name;
                 poly.confidence = det.confidence;
+                
+                // Link polygon and rect together so deleting one deletes the other
+                poly.linkedObj = rect;
+                rect.linkedObj = poly;
+                
                 canvas.add(poly);
             }
-            
-            // 3. Draw Label Text
-            const text = new fabric.Text(`${det.class_name}: ${(det.confidence || 1.0).toFixed(2)}`, {
-                left: det.x1 * scale,
-                top: (det.y1 * scale) - 20,
-                fontSize: 16,
-                backgroundColor: 'green',
-                fill: 'white',
-                selectable: false,
-                evented: false
-            });
-            text.isAuxiliary = true;
-            canvas.add(text);
 
         });
 
@@ -178,6 +170,17 @@ document
 
     }
 
+    // If the selected object has a linked polygon/rect, delete it too
+    if (obj.linkedObj) {
+        canvas.remove(obj.linkedObj);
+    }
+    
+    // Fallback: search canvas for any object linking to this one
+    canvas.getObjects().forEach(o => {
+        if (o.linkedObj === obj) {
+            canvas.remove(o);
+        }
+    });
 
     canvas.remove(obj);
 
@@ -565,12 +568,12 @@ document
 
     if (
         !obj ||
-        obj.type !== "rect" ||
+        (obj.type !== "rect" && obj.type !== "polygon") ||
         !obj.className
     ) {
 
         alert(
-            "Please select a bounding box first."
+            "Please select a bounding box or mask first."
         );
 
         return;
@@ -630,6 +633,12 @@ document
     // Remove old AI confidence
     obj.confidence =
         null;
+        
+    // Also update linked object if it exists
+    if (obj.linkedObj) {
+        obj.linkedObj.className = cleanedClassName;
+        obj.linkedObj.confidence = null;
+    }
 
 
     // Mark unsaved
@@ -637,6 +646,7 @@ document
         true;
 
 
+    // Redraw canvas with new text
     canvas.renderAll();
 
 };
@@ -946,10 +956,14 @@ canvas.on(
         .getObjects()
         .forEach(obj => {
 
+            // Skip auxiliary objects (like the transparent rect behind a polygon)
+            if (obj.isAuxiliary) {
+                return;
+            }
 
-            // Only annotation rectangles
+            // Only annotation rectangles and polygons
             if (
-                obj.type !== "rect" ||
+                (obj.type !== "rect" && obj.type !== "polygon") ||
                 !obj.className
             ) {
                 return;
@@ -1016,14 +1030,15 @@ canvas.on(
             ) {
 
                 labelTop =
-                    top;
+                    top +
+                    boundingRect.height;
 
             }
 
 
             // Background
             ctx.fillStyle =
-                "red";
+                "rgba(0, 128, 0, 0.8)";
 
 
             ctx.fillRect(
@@ -1053,7 +1068,7 @@ canvas.on(
                 padding,
 
                 labelTop +
-                16
+                15
 
             );
 
@@ -1231,4 +1246,47 @@ function loadDatasetProgress() {
 
 // Load dashboard when page opens
 loadDatasetProgress();
+
+
+// ==========================================
+// BULK RENAME CLASSES
+// ==========================================
+
+document.getElementById("bulkRenameBtn")?.addEventListener("click", function() {
+    const fromClass = document.getElementById("rename-from").value.trim();
+    const toClass = document.getElementById("rename-to").value.trim();
+    
+    if (!fromClass || !toClass) {
+        alert("Please enter both the original and new class names.");
+        return;
+    }
+    
+    const btn = document.getElementById("bulkRenameBtn");
+    const originalText = btn.innerHTML;
+    btn.innerHTML = 'Renaming...';
+    btn.disabled = true;
+
+    fetch("/bulk_rename", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ from_class: fromClass, to_class: toClass })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === "success") {
+            hasUnsavedChanges = false;
+            window.location.reload();
+        } else {
+            alert("Error: " + data.message);
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
+    })
+    .catch(err => {
+        alert("Failed to reach server.");
+        console.error(err);
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    });
+});
 
