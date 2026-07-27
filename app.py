@@ -1472,6 +1472,58 @@ def export_dataset():
     )
 
 # ==========================================
+# RESET WORKSPACE
+# ==========================================
+
+@app.route("/reset_workspace", methods=["POST"])
+def reset_workspace():
+    global batch_images
+    global current_image_index
+    global current_classes
+    
+    import shutil
+    import os
+
+    # Folders to clear
+    folders_to_clear = ["uploads", "static/outputs", "labels", "yolo_dataset"]
+    
+    for folder in folders_to_clear:
+        if os.path.exists(folder):
+            for filename in os.listdir(folder):
+                file_path = os.path.join(folder, filename)
+                try:
+                    if os.path.isfile(file_path) or os.path.islink(file_path):
+                        os.unlink(file_path)
+                    elif os.path.isdir(file_path):
+                        shutil.rmtree(file_path)
+                except Exception as e:
+                    print(f"Failed to delete {file_path}. Reason: {e}")
+            
+            # If it's the yolo_dataset folder, we can delete the folder itself
+            if folder == "yolo_dataset":
+                try:
+                    os.rmdir(folder)
+                except:
+                    pass
+                    
+    # Delete specific files
+    files_to_delete = ["classes.txt", "yolo_dataset.zip"]
+    for file in files_to_delete:
+        if os.path.exists(file):
+            try:
+                os.remove(file)
+            except:
+                pass
+            
+    # Reset globals
+    batch_images = []
+    current_image_index = 0
+    current_classes = []
+    
+    return jsonify({"status": "success"})
+
+
+# ==========================================
 # DATASET PROGRESS
 # ==========================================
 
