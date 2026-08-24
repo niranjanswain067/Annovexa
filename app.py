@@ -10,6 +10,8 @@ from flask import (
 import os
 import shutil
 import random
+import cv2
+import math
 from werkzeug.utils import secure_filename
 
 from class_manager import add_classes, load_classes
@@ -197,15 +199,66 @@ def detect():
     current_image_index = 0
 
 
+    # ======================================
+    # EXTRACT FILES AND VIDEO FRAMES
+    # ======================================
+
+    processed_files = []
+    
+    print("\nStarting file processing and frame extraction...")
+    
+    for uploaded_file in images:
+        filename = secure_filename(uploaded_file.filename)
+        if not filename:
+            continue
+            
+        file_path = os.path.join(UPLOAD_FOLDER, filename)
+        uploaded_file.save(file_path)
+        
+        lower_filename = filename.lower()
+        if lower_filename.endswith(('.mp4', '.avi', '.mov', '.mkv', '.webm', '.m4v')):
+            print(f"Extracting frames from video: {filename}")
+            cap = cv2.VideoCapture(file_path)
+            fps = cap.get(cv2.CAP_PROP_FPS)
+            if fps <= 0 or math.isnan(fps):
+                fps = 1
+                
+            frame_count = 0
+            extracted_count = 1
+            success, frame = cap.read()
+            while success:
+                # Extract 1 frame per second
+                if frame_count % math.ceil(fps) == 0:
+                    base_name = os.path.splitext(filename)[0]
+                    frame_filename = f"{base_name}_frame_{extracted_count:04d}.jpg"
+                    frame_path = os.path.join(UPLOAD_FOLDER, frame_filename)
+                    cv2.imwrite(frame_path, frame)
+                    processed_files.append({
+                        "filename": frame_filename,
+                        "path": frame_path
+                    })
+                    extracted_count += 1
+                
+                success, frame = cap.read()
+                frame_count += 1
+            cap.release()
+            print(f"Extracted {extracted_count - 1} frames from {filename}")
+        else:
+            processed_files.append({
+                "filename": filename,
+                "path": file_path
+            })
+
+
     total_images = len(
-        images
+        processed_files
     )
 
 
     print(
 
         f"\nStarting batch annotation "
-        f"for {total_images} images..."
+        f"for {total_images} images/frames..."
 
     )
 
@@ -214,24 +267,14 @@ def detect():
     # PROCESS EVERY IMAGE
     # ======================================
 
-    for image_number, image in enumerate(
-        images,
+    for image_number, file_info in enumerate(
+        processed_files,
         start=1
     ):
 
 
-        # ==================================
-        # SECURE FILE NAME
-        # ==================================
-
-        filename = secure_filename(
-            image.filename
-        )
-
-
-        if not filename:
-
-            continue
+        filename = file_info["filename"]
+        image_path = file_info["path"]
 
 
         print(
@@ -251,24 +294,6 @@ def detect():
         print(
             "Filename:",
             filename
-        )
-
-
-        # ==================================
-        # SAVE ORIGINAL IMAGE
-        # ==================================
-
-        image_path = os.path.join(
-
-            UPLOAD_FOLDER,
-
-            filename
-
-        )
-
-
-        image.save(
-            image_path
         )
 
 

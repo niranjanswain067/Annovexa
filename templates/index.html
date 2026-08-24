@@ -66,8 +66,8 @@
                     <div class="file-upload-wrapper">
                         <label class="file-upload-box">
                             <i class="ph ph-image"></i>
-                            <span id="file-upload-text">Select Images</span>
-                            <input id="file-upload-input" type="file" name="images" accept="image/*" multiple required
+                            <span id="file-upload-text">Select Images or Videos</span>
+                            <input id="file-upload-input" type="file" name="images" accept="image/*,video/*" multiple required
                                 hidden>
                         </label>
                     </div>
@@ -214,7 +214,7 @@
             <div class="empty-state">
                 <i class="ph-duotone ph-upload-simple"></i>
                 <h2>Welcome to Annovexa</h2>
-                <p>Upload images and enter object classes on the left to start auto-annotating.</p>
+                <p>Upload images or videos and enter object classes on the left to start auto-annotating.</p>
             </div>
 
             {% endif %}
@@ -224,7 +224,7 @@
     <!-- Loading Overlay -->
     <div id="loadingOverlay" class="loading-overlay">
         <div class="spinner"></div>
-        <div class="loading-text">AI is detecting objects...</div>
+        <div class="loading-text">AI is processing files and detecting objects...</div>
     </div>
 
     <script>
@@ -237,10 +237,10 @@
             fileInput.addEventListener('change', function () {
                 if (this.files && this.files.length > 0) {
                     const count = this.files.length;
-                    fileText.textContent = count + (count === 1 ? ' image selected' : ' images selected');
+                    fileText.textContent = count + (count === 1 ? ' file selected' : ' files selected');
                     fileText.style.color = 'var(--accent-primary)';
                 } else {
-                    fileText.textContent = 'Select Images';
+                    fileText.textContent = 'Select Images or Videos';
                     fileText.style.color = '';
                 }
             });
