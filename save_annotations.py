@@ -2,6 +2,7 @@ import os
 
 
 def save_edited_annotations(
+    project_name,
     annotations,
     image_filename,
     image_width,
@@ -14,13 +15,14 @@ def save_edited_annotations(
     and save them to a TXT file.
     """
 
-    os.makedirs("labels", exist_ok=True)
+    labels_dir = os.path.join("projects", project_name, "labels")
+    os.makedirs(labels_dir, exist_ok=True)
 
     # Remove image extension
     image_name = os.path.splitext(image_filename)[0]
 
     label_path = os.path.join(
-        "labels",
+        labels_dir,
         image_name + ".txt"
     )
 

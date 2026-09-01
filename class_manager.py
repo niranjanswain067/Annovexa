@@ -1,15 +1,17 @@
 import os
 
-CLASS_FILE = "classes.txt"
+def get_class_file_path(project_name):
+    return os.path.join("projects", project_name, "classes.txt")
 
 
-def load_classes():
+def load_classes(project_name):
 
-    if not os.path.exists(CLASS_FILE):
+    class_file = get_class_file_path(project_name)
+    if not os.path.exists(class_file):
         return []
 
     with open(
-        CLASS_FILE,
+        class_file,
         "r",
         encoding="utf-8"
     ) as file:
@@ -23,10 +25,13 @@ def load_classes():
     return classes
 
 
-def save_classes(classes):
+def save_classes(project_name, classes):
+
+    class_file = get_class_file_path(project_name)
+    os.makedirs(os.path.dirname(class_file), exist_ok=True)
 
     with open(
-        CLASS_FILE,
+        class_file,
         "w",
         encoding="utf-8"
     ) as file:
@@ -38,9 +43,9 @@ def save_classes(classes):
             )
 
 
-def add_classes(new_classes):
+def add_classes(project_name, new_classes):
 
-    classes = load_classes()
+    classes = load_classes(project_name)
 
     for class_name in new_classes:
 
@@ -55,14 +60,14 @@ def add_classes(new_classes):
                 class_name
             )
 
-    save_classes(classes)
+    save_classes(project_name, classes)
 
     return classes
 
 
-def get_class_id(class_name):
+def get_class_id(project_name, class_name):
 
-    classes = load_classes()
+    classes = load_classes(project_name)
 
     if class_name not in classes:
 
@@ -70,7 +75,7 @@ def get_class_id(class_name):
             class_name
         )
 
-        save_classes(classes)
+        save_classes(project_name, classes)
 
     return classes.index(
         class_name

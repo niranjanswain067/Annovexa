@@ -4,6 +4,7 @@ from class_manager import add_classes, load_classes
 
 
 def save_yolo_labels(
+    project_name,
     result,
     image_path,
     detection_classes
@@ -30,11 +31,11 @@ def save_yolo_labels(
     # CREATE LABELS FOLDER
     # ==========================================
 
+    labels_dir = os.path.join("projects", project_name, "labels")
     os.makedirs(
-        "labels",
+        labels_dir,
         exist_ok=True
     )
-
 
     # ==========================================
     # GET IMAGE NAME
@@ -50,7 +51,7 @@ def save_yolo_labels(
     # ==========================================
 
     label_path = os.path.join(
-        "labels",
+        labels_dir,
         image_name + ".txt"
     )
 
@@ -60,12 +61,13 @@ def save_yolo_labels(
     # ==========================================
 
     add_classes(
+        project_name,
         detection_classes
     )
 
 
     # Load permanent classes
-    permanent_classes = load_classes()
+    permanent_classes = load_classes(project_name)
 
 
     # ==========================================

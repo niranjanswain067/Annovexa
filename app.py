@@ -28,47 +28,54 @@ from utils import results_to_json
 app = Flask(__name__)
 
 
+
 # ==========================================
-# FOLDERS
+# FOLDERS (Now scoped to projects)
 # ==========================================
 
-UPLOAD_FOLDER = "uploads"
-OUTPUT_FOLDER = os.path.join(
-    "static",
-    "outputs"
-)
-LABEL_FOLDER = "labels"
+def get_project_folders(project_name):
+    base = os.path.join("projects", project_name)
+    return {
+        "uploads": os.path.join(base, "uploads"),
+        "outputs": os.path.join(base, "outputs"),
+        "labels": os.path.join(base, "labels"),
+        "export": os.path.join(base, "yolo_dataset")
+    }
 
-EXPORT_FOLDER = "yolo_dataset"
 
-os.makedirs(
-    UPLOAD_FOLDER,
-    exist_ok=True
-)
-
-os.makedirs(
-    OUTPUT_FOLDER,
-    exist_ok=True
-)
-
-os.makedirs(
-    LABEL_FOLDER,
-    exist_ok=True
-)
 
 
 # ==========================================
 # APPLICATION STATE
 # ==========================================
 
+project_sessions = {}
+
+def get_session(project_name):
+    if project_name not in project_sessions:
+        from class_manager import load_classes
+        project_sessions[project_name] = {
+            "batch_images": [],
+            "current_image_index": 0,
+            "current_classes": load_classes(project_name)
+        }
+    return project_sessions[project_name]
+
+
+# ==========================================
+
 # Permanent dataset classes
-current_classes = load_classes()
+    session["current_classes"] = load_classes(project_name)
+    current_classes = session["current_classes"]
 
 # Stores all images in current batch
-batch_images = []
+    session["batch_images"] = []
+    batch_images = session["batch_images"]
 
 # Current image being reviewed
-current_image_index = 0
+    session["current_image_index"] = 0
+    current_image_index = 0
+
 
 
 # ==========================================
@@ -77,28 +84,60 @@ current_image_index = 0
 
 @app.route("/")
 def home():
-    
-    unique_classes = sorted(list(set(load_classes())))
+    os.makedirs("projects", exist_ok=True)
+    projects = [d for d in os.listdir("projects") if os.path.isdir(os.path.join("projects", d))]
+    return render_template("dashboard.html", projects=projects)
 
-    return render_template(
-        "index.html",
-        available_classes=unique_classes
-    )
+@app.route("/create_project", methods=["POST"])
+def create_project():
+    from flask import request, redirect
+    project_name = request.form.get("project_name", "").strip()
+    if project_name:
+        folders = get_project_folders(project_name)
+        for f in folders.values():
+            os.makedirs(f, exist_ok=True)
+    return redirect("/")
+
+@app.route("/delete_project", methods=["POST"])
+def delete_project():
+    from flask import request, jsonify
+    import shutil
+    data = request.get_json(silent=True)
+    project_name = data.get("project_name", "")
+    if project_name:
+        proj_dir = os.path.join("projects", project_name)
+        if os.path.exists(proj_dir):
+            shutil.rmtree(proj_dir)
+            if project_name in project_sessions:
+                del project_sessions[project_name]
+    return jsonify({"status": "success"})
+
+@app.route("/project/<project_name>")
+def project_home(project_name):
+    from class_manager import load_classes
+    unique_classes = sorted(list(set(load_classes(project_name))))
+    return render_template("index.html", available_classes=unique_classes, project_name=project_name)
+
+@app.route("/project/<project_name>/outputs/<filename>")
+def serve_output(project_name, filename):
+    import os
+    from flask import send_from_directory
+    return send_from_directory(os.path.abspath(os.path.join("projects", project_name, "outputs")), filename)
+
 
 
 # ==========================================
 # BATCH AUTO ANNOTATION
 # ==========================================
 
-@app.route(
-    "/detect",
+@app.route("/project/<project_name>/detect",
     methods=["POST"]
 )
-def detect():
-
-    global batch_images
-    global current_image_index
-    global current_classes
+def detect(project_name):
+    session = get_session(project_name)
+    batch_images = session["batch_images"]
+    current_image_index = session["current_image_index"]
+    current_classes = session["current_classes"]
 
 
     # ======================================
@@ -161,10 +200,7 @@ def detect():
     # ======================================
     # UPDATE PERMANENT CLASS LIST
     # ======================================
-
-    current_classes = add_classes(
-        class_list
-    )
+    session["current_classes"] = add_classes(project_name, class_list)
 
 
     print(
@@ -193,9 +229,9 @@ def detect():
     # ======================================
     # RESET PREVIOUS BATCH
     # ======================================
-
-    batch_images = []
-
+    session["batch_images"] = []
+    batch_images = session["batch_images"]
+    session["current_image_index"] = 0
     current_image_index = 0
 
 
@@ -212,7 +248,8 @@ def detect():
         if not filename:
             continue
             
-        file_path = os.path.join(UPLOAD_FOLDER, filename)
+        folders = get_project_folders(project_name)
+        file_path = os.path.join(folders["uploads"], filename)
         uploaded_file.save(file_path)
         
         lower_filename = filename.lower()
@@ -231,7 +268,7 @@ def detect():
                 if frame_count % math.ceil(fps) == 0:
                     base_name = os.path.splitext(filename)[0]
                     frame_filename = f"{base_name}_frame_{extracted_count:04d}.jpg"
-                    frame_path = os.path.join(UPLOAD_FOLDER, frame_filename)
+                    frame_path = os.path.join(folders["uploads"], frame_filename)
                     cv2.imwrite(frame_path, frame)
                     processed_files.append({
                         "filename": frame_filename,
@@ -301,28 +338,14 @@ def detect():
         # RUN YOLO-WORLD
         # ==================================
 
-        output_path, result = detect_objects(
-
-            image_path,
-
-            class_list
-
-        )
+        output_path, result = detect_objects(project_name, image_path, class_list)
 
 
         # ==================================
         # SAVE INITIAL YOLO LABELS
         # ==================================
 
-        label_path = save_yolo_labels(
-
-            result,
-
-            image_path,
-
-            class_list
-
-        )
+        label_path = save_yolo_labels(project_name, result, image_path, class_list)
 
 
         print(
@@ -352,14 +375,7 @@ def detect():
         )
 
 
-        output_image = url_for(
-
-            "static",
-
-            filename=
-                f"outputs/{output_filename}"
-
-        )
+        output_image = url_for("serve_output", project_name=project_name, filename=output_filename)
 
 
         print(
@@ -417,7 +433,7 @@ def detect():
     # ======================================
     # OPEN FIRST IMAGE
     # ======================================
-
+    session["current_image_index"] = 0
     current_image_index = 0
 
 
@@ -454,20 +470,19 @@ def detect():
     # ======================================
 
     from flask import redirect
-    return redirect(url_for("show_image", index=0))
+    return redirect(url_for("show_image", project_name=project_name, index=0))
 
 
 # ==========================================
 # OPEN IMAGE FROM BATCH
 # ==========================================
 
-@app.route(
-    "/image/<int:index>"
-)
-def show_image(index):
-
-    global batch_images
-    global current_image_index
+@app.route("/project/<project_name>/image/<int:index>")
+def show_image(project_name, index):
+    session = get_session(project_name)
+    batch_images = session["batch_images"]
+    current_image_index = session["current_image_index"]
+    current_classes = session["current_classes"]
 
 
     # ======================================
@@ -508,7 +523,7 @@ def show_image(index):
     # ======================================
     # UPDATE CURRENT IMAGE
     # ======================================
-
+    session["current_image_index"] = index
     current_image_index = index
 
 
@@ -530,11 +545,11 @@ def show_image(index):
     from class_manager import load_classes
 
     image_name = os.path.splitext(os.path.basename(image_data["filename"]))[0]
-    label_path = os.path.join("labels", f"{image_name}.txt")
+    label_path = os.path.join("projects", project_name, "labels", f"{image_name}.txt")
 
     if os.path.exists(label_path) and not image_data.get("ai_fresh"):
         try:
-            permanent_classes = load_classes()
+            permanent_classes = load_classes(project_name)
             local_image_path = image_data["output_image"].lstrip("/")
             img = cv2.imread(local_image_path)
             if img is not None:
@@ -609,7 +624,7 @@ def show_image(index):
     # ======================================
     # COLLECT ALL UNIQUE CLASSES FOR DROPDOWN
     # ======================================
-    all_classes = set(load_classes())
+    all_classes = set(load_classes(project_name))
     for img_data in batch_images:
         if img_data.get("detections"):
             for det in img_data["detections"]:
@@ -629,7 +644,8 @@ def show_image(index):
         current_filename=image_data["filename"],
         current_index=current_image_index,
         total_images=len(batch_images),
-        available_classes=unique_classes
+        available_classes=unique_classes,
+        project_name=project_name
     )
 
 
@@ -637,9 +653,12 @@ def show_image(index):
 # BULK RENAME CLASSES ACROSS DATASET
 # ==========================================
 
-@app.route("/bulk_rename", methods=["POST"])
-def bulk_rename():
-    global batch_images
+@app.route("/project/<project_name>/bulk_rename", methods=["POST"])
+def bulk_rename(project_name):
+    session = get_session(project_name)
+    batch_images = session["batch_images"]
+    current_image_index = session["current_image_index"]
+    current_classes = session["current_classes"]
     data = request.get_json(silent=True)
     if not data:
         return jsonify({"status": "error", "message": "No data received."}), 400
@@ -651,7 +670,7 @@ def bulk_rename():
         return jsonify({"status": "error", "message": "Missing class names."}), 400
         
     from class_manager import load_classes, save_classes
-    classes = load_classes()
+    classes = load_classes(project_name)
     
     # Create a lower-case map of existing classes
     classes_lower = [c.lower() for c in classes]
@@ -667,13 +686,13 @@ def bulk_rename():
         if new_class not in classes_lower:
             # Easy case: just rename it in classes.txt
             classes[old_id] = new_class
-            save_classes(classes)
+            save_classes(project_name, classes)
             new_id = old_id
         else:
             # Merge case: new class already exists. Find its ID and replace old_id with new_id in all .txt files
             new_id = classes_lower.index(new_class)
             import os
-            labels_dir = "labels"
+            labels_dir = os.path.join("projects", project_name, "labels")
             if os.path.exists(labels_dir):
                 for filename in os.listdir(labels_dir):
                     if filename.endswith(".txt"):
@@ -712,15 +731,14 @@ def bulk_rename():
 # SAVE EDITED ANNOTATIONS
 # ==========================================
 
-@app.route(
-    "/save_labels",
+@app.route("/project/<project_name>/save_labels",
     methods=["POST"]
 )
-def save_labels():
-
-    global batch_images
-    global current_image_index
-    global current_classes
+def save_labels(project_name):
+    session = get_session(project_name)
+    batch_images = session["batch_images"]
+    current_image_index = session["current_image_index"]
+    current_classes = session["current_classes"]
 
 
     # ======================================
@@ -963,10 +981,7 @@ def save_labels():
     # ======================================
     # UPDATE PERMANENT CLASS LIST
     # ======================================
-
-    current_classes = add_classes(
-        annotation_classes
-    )
+    session["current_classes"] = add_classes(project_name, annotation_classes)
 
 
     # ======================================
@@ -976,7 +991,7 @@ def save_labels():
     label_path, updated_classes = (
 
         save_edited_annotations(
-
+            project_name=project_name,
             annotations=
                 annotations,
 
@@ -998,11 +1013,8 @@ def save_labels():
         )
 
     )
-
-
-    current_classes = (
-        updated_classes
-    )
+    session["current_classes"] = updated_classes
+    current_classes = session["current_classes"]
 
 
     # ======================================
@@ -1127,11 +1139,12 @@ def save_labels():
 # 80% TRAIN / 20% VALIDATION
 # ==========================================
 
-@app.route("/export_dataset")
-def export_dataset():
-
-    global batch_images
-    global current_classes
+@app.route("/project/<project_name>/export_dataset")
+def export_dataset(project_name):
+    session = get_session(project_name)
+    batch_images = session["batch_images"]
+    current_image_index = session["current_image_index"]
+    current_classes = session["current_classes"]
 
     # ======================================
     # CHECK DATASET
@@ -1146,17 +1159,18 @@ def export_dataset():
 
 
     # Reload permanent classes
-    current_classes = load_classes()
+    session["current_classes"] = load_classes(project_name)
+    current_classes = session["current_classes"]
 
 
     # ======================================
     # REMOVE OLD EXPORT FOLDER
     # ======================================
 
-    if os.path.exists(EXPORT_FOLDER):
+    if os.path.exists(get_project_folders(project_name)["export"]):
 
         shutil.rmtree(
-            EXPORT_FOLDER
+            get_project_folders(project_name)["export"]
         )
 
 
@@ -1165,12 +1179,12 @@ def export_dataset():
     # ======================================
 
     images_folder = os.path.join(
-        EXPORT_FOLDER,
+        get_project_folders(project_name)["export"],
         "images"
     )
 
     labels_folder = os.path.join(
-        EXPORT_FOLDER,
+        get_project_folders(project_name)["export"],
         "labels"
     )
 
@@ -1220,7 +1234,7 @@ def export_dataset():
             # ==================================
 
             source_image = os.path.join(
-                UPLOAD_FOLDER,
+                get_project_folders(project_name)["uploads"],
                 filename
             )
 
@@ -1259,7 +1273,7 @@ def export_dataset():
 
 
             source_label = os.path.join(
-                LABEL_FOLDER,
+                get_project_folders(project_name)["labels"],
                 label_filename
             )
 
@@ -1322,7 +1336,7 @@ def export_dataset():
     # ======================================
 
     classes_path = os.path.join(
-        EXPORT_FOLDER,
+        get_project_folders(project_name)["export"],
         "classes.txt"
     )
 
@@ -1347,7 +1361,7 @@ def export_dataset():
     # ======================================
 
     yaml_path = os.path.join(
-        EXPORT_FOLDER,
+        get_project_folders(project_name)["export"],
         "data.yaml"
     )
 
@@ -1405,7 +1419,7 @@ def export_dataset():
     # ======================================
 
     zip_filename = (
-        EXPORT_FOLDER +
+        get_project_folders(project_name)["export"] +
         ".zip"
     )
 
@@ -1425,11 +1439,11 @@ def export_dataset():
 
     zip_path = shutil.make_archive(
 
-        EXPORT_FOLDER,
+        get_project_folders(project_name)["export"],
 
         "zip",
 
-        EXPORT_FOLDER
+        get_project_folders(project_name)["export"]
 
     )
 
@@ -1497,65 +1511,15 @@ def export_dataset():
     )
 
 # ==========================================
-# RESET WORKSPACE
-# ==========================================
-
-@app.route("/reset_workspace", methods=["POST"])
-def reset_workspace():
-    global batch_images
-    global current_image_index
-    global current_classes
-    
-    import shutil
-    import os
-
-    # Folders to clear
-    folders_to_clear = ["uploads", "static/outputs", "labels", "yolo_dataset"]
-    
-    for folder in folders_to_clear:
-        if os.path.exists(folder):
-            for filename in os.listdir(folder):
-                file_path = os.path.join(folder, filename)
-                try:
-                    if os.path.isfile(file_path) or os.path.islink(file_path):
-                        os.unlink(file_path)
-                    elif os.path.isdir(file_path):
-                        shutil.rmtree(file_path)
-                except Exception as e:
-                    print(f"Failed to delete {file_path}. Reason: {e}")
-            
-            # If it's the yolo_dataset folder, we can delete the folder itself
-            if folder == "yolo_dataset":
-                try:
-                    os.rmdir(folder)
-                except:
-                    pass
-                    
-    # Delete specific files
-    files_to_delete = ["classes.txt", "yolo_dataset.zip"]
-    for file in files_to_delete:
-        if os.path.exists(file):
-            try:
-                os.remove(file)
-            except:
-                pass
-            
-    # Reset globals
-    batch_images = []
-    current_image_index = 0
-    current_classes = []
-    
-    return jsonify({"status": "success"})
-
-
-# ==========================================
 # DATASET PROGRESS
 # ==========================================
 
-@app.route("/progress")
-def dataset_progress():
-
-    global batch_images
+@app.route("/project/<project_name>/progress")
+def dataset_progress(project_name):
+    session = get_session(project_name)
+    batch_images = session["batch_images"]
+    current_image_index = session["current_image_index"]
+    current_classes = session["current_classes"]
 
     total_images = len(batch_images)
 

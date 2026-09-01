@@ -7,7 +7,7 @@ import shutil
 model = YOLO("models/yolov8s-seg.pt")
 
 
-def detect_objects(image_path, class_names):
+def detect_objects(project_name, image_path, class_names):
     """
     image_path : path of uploaded image
     class_names : list like ['bottle','chair','table']
@@ -40,7 +40,9 @@ def detect_objects(image_path, class_names):
 
     result = results[0]
 
-    output_path = os.path.join("static", "outputs", os.path.basename(image_path))
+    out_dir = os.path.join("projects", project_name, "outputs")
+    os.makedirs(out_dir, exist_ok=True)
+    output_path = os.path.join(out_dir, os.path.basename(image_path))
 
     # The frontend uses Fabric.js to draw over the clean image
     shutil.copy(image_path, output_path)

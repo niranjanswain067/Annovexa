@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Annovexa - Projects</title>
+
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .projects-container {
+            max-width: 1000px;
+            margin: 40px auto;
+            padding: 20px;
+        }
+
+        .projects-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .projects-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .project-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            transition: transform 0.2s, border-color 0.2s;
+        }
+
+        .project-card:hover {
+            transform: translateY(-2px);
+            border-color: var(--accent-primary);
+        }
+
+        .project-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+
+        .project-actions {
+            display: flex;
+            justify-content: space-between;
+            margin-top: auto;
+        }
+
+        .new-project-card {
+            border: 2px dashed var(--border-color);
+            background: rgba(255, 255, 255, 0.02);
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            min-height: 160px;
+        }
+
+        .new-project-card:hover {
+            border-color: var(--accent-primary);
+            background: rgba(var(--accent-primary-rgb), 0.05);
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: var(--bg-surface);
+            padding: 30px;
+            border-radius: 12px;
+            width: 100%;
+            max-width: 400px;
+            border: 1px solid var(--border-color);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            font-size: 1.2rem;
+        }
+
+        .close-modal {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 1.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 10px;
+            background: var(--bg-background);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+        }
+    </style>
+</head>
+
+<body>
+    <header class="app-header">
+        <div class="logo">
+            <img src="{{ url_for('static', filename='logo.jpeg') }}" alt="Annovexa Logo" class="app-logo">
+            <span>Annovexa</span>
+        </div>
+    </header>
+
+    <div class="projects-container">
+        <div class="projects-header">
+            <h2>Your Projects</h2>
+        </div>
+
+        <div class="projects-grid">
+            <!-- New Project Card -->
+            <div class="project-card new-project-card" onclick="document.getElementById('newProjectModal').style.display='flex'">
+                <i class="ph ph-plus-circle" style="font-size: 2.5rem; color: var(--accent-primary);"></i>
+                <span style="font-weight: 500; color: var(--text-primary);">Create New Project</span>
+            </div>
+
+            {% for project in projects %}
+            <div class="project-card">
+                <a href="/project/{{ project }}" class="project-title">
+                    <i class="ph ph-folder"></i> {{ project }}
+                </a>
+                <div class="project-actions">
+                    <a href="/project/{{ project }}" class="btn btn-primary btn-tool">Open Project</a>
+                    <button class="btn btn-tool btn-danger" onclick="deleteProject('{{ project }}')">
+                        <i class="ph ph-trash"></i>
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- New Project Modal -->
+    <div id="newProjectModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Create New Project</h3>
+                <button class="close-modal" onclick="document.getElementById('newProjectModal').style.display='none'"><i class="ph ph-x"></i></button>
+            </div>
+            <form action="/create_project" method="POST">
+                <div class="form-group">
+                    <label>Project Name (Alphanumeric and underscores only)</label>
+                    <input type="text" name="project_name" pattern="[a-zA-Z0-9_]+" required placeholder="e.g. my_dataset_1">
+                </div>
+                <button type="submit" class="btn btn-primary btn-full">Create Project</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function deleteProject(projectName) {
+            if (confirm(`Are you sure you want to delete project '${projectName}'?\nThis will delete all images and labels in it.`)) {
+                fetch('/delete_project', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ project_name: projectName })
+                }).then(res => res.json()).then(data => {
+                    if (data.status === 'success') window.location.reload();
+                    else alert(data.message);
+                });
+            }
+        }
+    </script>
+</body>
+</html>

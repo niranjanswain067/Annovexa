@@ -27,29 +27,9 @@
             <span>Annovexa</span>
         </div>
         <div class="header-actions" style="display: flex; align-items: center; gap: 12px;">
-            <button id="newProjectBtn" class="header-btn" title="Start New Project (Clear All Data)" style="color: #ff4d4d; border: 1px solid #ff4d4d; border-radius: 6px; padding: 4px 10px; cursor: pointer; background: transparent; display: flex; align-items: center; gap: 5px; font-weight: 500;">
-                <i class="ph ph-trash"></i> Reset Project
+            <button id="backBtn" class="header-btn" title="Back to Projects" style="color: #fff; border: 1px solid #555; border-radius: 6px; padding: 4px 10px; cursor: pointer; background: transparent; display: flex; align-items: center; gap: 5px; font-weight: 500;" onclick="window.location.href='/'">
+                <i class="ph ph-arrow-left"></i> Projects
             </button>
-            <script>
-                document.getElementById('newProjectBtn').addEventListener('click', function() {
-                    if (confirm("Are you sure you want to start a new project?\n\nThis will DELETE ALL images and labels in the current workspace. This action cannot be undone.")) {
-                        const btn = this;
-                        btn.innerHTML = '<i class="ph ph-spinner"></i> Resetting...';
-                        btn.disabled = true;
-                        
-                        fetch('/reset_workspace', { method: 'POST' })
-                        .then(res => res.json())
-                        .then(data => {
-                            window.location.href = '/';
-                        })
-                        .catch(err => {
-                            alert("Failed to reset workspace.");
-                            btn.innerHTML = '<i class="ph ph-trash"></i> Reset Project';
-                            btn.disabled = false;
-                        });
-                    }
-                });
-            </script>
             <a href="https://github.com" target="_blank" class="header-btn" title="Documentation"><i
                     class="ph ph-book-open"></i></a>
         </div>
@@ -62,7 +42,7 @@
 
             <div class="sidebar-section">
                 <h3 class="section-title"><i class="ph ph-upload-simple"></i> Upload Data</h3>
-                <form id="uploadForm" action="/detect" method="POST" enctype="multipart/form-data" class="upload-form">
+                <form id="uploadForm" action="/project/{{ project_name }}/detect" method="POST" enctype="multipart/form-data" class="upload-form">
                     <div class="file-upload-wrapper">
                         <label class="file-upload-box">
                             <i class="ph ph-image"></i>
@@ -115,7 +95,7 @@
 
             <div class="sidebar-section">
                 <h3 class="section-title"><i class="ph ph-export"></i> Export</h3>
-                <a href="/export_dataset" class="export-link">
+                <a href="/project/{{ project_name }}/export_dataset" class="export-link">
                     <button type="button" class="btn btn-secondary btn-full"><i class="ph ph-download-simple"></i>
                         Download YOLO Dataset</button>
                 </a>
@@ -141,7 +121,7 @@
                 <div class="navigation-controls">
                     {% if current_index > 0 %}
                     <button type="button" class="btn btn-icon"
-                        onclick="window.location.href='/image/{{ current_index - 1 }}'" title="Previous Image">
+                        onclick="window.location.href=\'/project/{{ project_name }}/image/{{ current_index - 1 }}'" title="Previous Image">
                         <i class="ph ph-caret-left"></i>
                     </button>
                     {% else %}
@@ -149,7 +129,7 @@
                     {% endif %}
 
                     {% if current_index < total_images - 1 %} <button type="button" class="btn btn-icon"
-                        onclick="window.location.href='/image/{{ current_index + 1 }}'" title="Next Image">
+                        onclick="window.location.href=\'/project/{{ project_name }}/image/{{ current_index + 1 }}'" title="Next Image">
                         <i class="ph ph-caret-right"></i>
                         </button>
                         {% else %}
@@ -204,6 +184,7 @@
             <img id="sourceImage" src="{{ output_image }}" hidden>
 
             <script>
+                const PROJECT_NAME = "{{ project_name }}";
                 const detections = {{ detections | tojson }};
             </script>
             <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>

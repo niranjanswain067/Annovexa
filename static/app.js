@@ -753,7 +753,7 @@ function saveLabels(
 
 
     fetch(
-        "/save_labels",
+        "/project/" + PROJECT_NAME + "/save_labels",
         {
 
             method:
@@ -846,7 +846,7 @@ function saveLabels(
 
                 // Navigate after saving
                 window.location.href =
-                    "/image/" +
+                    "/project/" + PROJECT_NAME + "/image/" +
                     nextIndex;
 
             }
@@ -1201,7 +1201,7 @@ window.addEventListener(
 
 function loadDatasetProgress() {
 
-    fetch("/progress")
+    fetch("/project/" + PROJECT_NAME + "/progress")
 
     .then(response => response.json())
 
@@ -1266,7 +1266,7 @@ document.getElementById("bulkRenameBtn")?.addEventListener("click", function() {
     btn.innerHTML = 'Renaming...';
     btn.disabled = true;
 
-    fetch("/bulk_rename", {
+    fetch("/project/" + PROJECT_NAME + "/bulk_rename", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ from_class: fromClass, to_class: toClass })
